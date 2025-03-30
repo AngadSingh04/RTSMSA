@@ -22,7 +22,10 @@ data "aws_subnets" "default" {
 
 # Redshift Serverless --->>>>>
 resource "aws_redshiftserverless_namespace" "sentiment_ns" {
-  namespace_name = "sentiment-analysis-ns"
+  namespace_name      = "sentiment-analysis-ns"
+  admin_username      = "adminuser"  # Explicit username
+  admin_user_password = "YourSecurePassword123!" # Must meet complexity requirements
+  iam_roles           = [aws_iam_role.lambda_role.arn]  # Add this line
 }
 
 resource "aws_redshiftserverless_workgroup" "sentiment_wg" {
@@ -30,18 +33,20 @@ resource "aws_redshiftserverless_workgroup" "sentiment_wg" {
   namespace_name = aws_redshiftserverless_namespace.sentiment_ns.namespace_name
 }
 
-# sentiment_results table
+# Updated create_table resource
 resource "aws_redshiftdata_statement" "create_table" {
   workgroup_name = aws_redshiftserverless_workgroup.sentiment_wg.workgroup_name
-  database       = "dev"  # Default database name
+  database       = "dev"
   sql            = <<SQL
     CREATE TABLE IF NOT EXISTS sentiment_results (
       text VARCHAR(5000),
       sentiment VARCHAR(20),
       created_at TIMESTAMP DEFAULT GETDATE()
     );
+    
+    GRANT USAGE ON SCHEMA public TO adminuser;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON sentiment_results TO adminuser;
   SQL
 
-  # Ensure Redshift is ready before creating the table
   depends_on = [aws_redshiftserverless_workgroup.sentiment_wg]
 }
